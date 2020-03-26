@@ -1,0 +1,5 @@
+RewriteEngine on
+RedirectMatch 301 ^/api/include/(.*)$ /
+RedirectMatch 301 ^/api/oauth2/$ /
+RedirectMatch 301 ^/api/$ /
+ErrorDocument 404 /api/error/404.php

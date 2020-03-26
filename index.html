@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="OAuth2.0 JavaScript Library">
+    <meta name="author" content="Sander Veldhuis">
+
+    <title>Siloft · OAuth2.0 JavaScript Library</title>
+  </head>
+
+  <body>
+    <h3>Events</h3>
+    <p id="events"></p>
+    <h3>Storage</h3>
+    <p id="storage"></p>
+
+    <script type="text/javascript" src="js/client-oauth2.js"></script>
+    <script type="text/javascript">
+      var oauth2 = new ClientOAuth2('http://localhost/api/oauth2/token/')
+      var events = document.getElementById('events')
+      var storage = document.getElementById('storage')
+
+      /**
+       * Display session storage information.
+       */
+      function displayStorage() {
+        storage.innerHTML += 'access_token = ' + sessionStorage.getItem('access_token')
+        storage.innerHTML += '</br>expires_in = ' + sessionStorage.getItem('expires_in')
+        storage.innerHTML += '</br>token_type = ' + sessionStorage.getItem('token_type')
+      }
+
+      /**
+       * Get resource information using the OAuth2.0 access token.
+       */
+      function getResource() {
+        events.innerHTML += 'Get resource... '
+        oauth2.sign({
+            url: 'http://localhost/api/resource/'
+          })
+          .then(function (json) {
+            events.innerHTML += json.message + '</br>'
+          })
+          .catch(function (error) {
+            events.innerHTML += error + '</br>'
+          })
+      }
+
+      /**
+       * Get a new OAuth2.0 access token using client credentials.
+       */
+      function getToken() {
+        events.innerHTML += 'Get token... '
+        oauth2.getToken('abc', '123')
+          .then(function () {
+            events.innerHTML += 'OK</br>'
+            displayStorage()
+            getResource()
+          })
+          .catch(function (error) {
+            events.innerHTML += error + '</br>'
+          })
+      }
+
+      /**
+       * Actual logic
+       */
+      if (oauth2.expired()) {
+        getToken()
+      } else {
+        displayStorage()
+        getResource()
+      }
+    </script>
+  </body>
+</html>
