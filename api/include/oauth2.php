@@ -20,8 +20,12 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
- 
+
+require_once 'mysql.php';
 require_once 'http.php';
+
+if (!defined('OAUTH2_TOKEN_TYPE')) define('OAUTH2_TOKEN_TYPE', 'Bearer');
+if (!defined('OAUTH2_EXPIRES_IN')) define('OAUTH2_EXPIRES_IN', 3600);
 
 class OAuth2
 {
@@ -54,19 +58,23 @@ class OAuth2
       HTTP::bad_request('invalid_request');
     }
 
-    // TODO: validate whether the authorization matches with an user in the database
-    if ($authorization !== 'Basic YWJjOjEyMw==')
+    $user = MySQL::query("SELECT * FROM `user` WHERE `authorization` = ?", "s", hash('sha512', $authorization))[0];
+    if ($user === null)
     {
       HTTP::unauthorized('invalid_client');
     }
 
     $accessToken = self::generate_token();
-    // TODO: Store in database with sha512(host) and sha512(user-agent)
+    $result = MySQL::query("INSERT INTO `token` VALUES(?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE `authorization` = ?, `host` = ?, `user_agent` = ?, `expires` = ?", "isssisssi", $user['id'], hash('sha512', OAUTH2_TOKEN_TYPE . ' ' . $accessToken), hash('sha512', self::get_host()), hash('sha512', $_SERVER['HTTP_USER_AGENT']), time() + OAUTH2_EXPIRES_IN, hash('sha512', OAUTH2_TOKEN_TYPE . ' ' . $accessToken), hash('sha512', self::get_host()), hash('sha512', $_SERVER['HTTP_USER_AGENT']), time() + OAUTH2_EXPIRES_IN);
+    if ($result < 0)
+    {
+      HTTP::internal_server_error(MySQL::getError());
+    }
 
     HTTP::ok([
       'access_token' => $accessToken,
-      'token_type' => 'Bearer',
-      'expires_in' => 3600
+      'token_type' => OAUTH2_TOKEN_TYPE,
+      'expires_in' => OAUTH2_EXPIRES_IN
     ]);
   }
 
@@ -79,12 +87,21 @@ class OAuth2
       HTTP::bad_request('invalid_request');
     }
 
-    // TODO: validate whether the authorization matches with a token in the database, if so also validate:
-    // User-Agent hash (check if client matches with token request)
-    // Host hash (check if client matches with token request)
-    if ($authorization !== 'Bearer XQvRpmwIQWOkgdDV')
+    $host = self::get_host();
+    $token = MySQL::query("SELECT * FROM `token` WHERE `authorization` = ? AND `host` = ? AND `user_agent` = ?", "sss", hash('sha512', $authorization), hash('sha512', self::get_host()), hash('sha512', $_SERVER['HTTP_USER_AGENT']))[0];
+    if ($token === null || $token['expires'] <= time())
     {
       HTTP::unauthorized('invalid_token');
     }
+  }
+
+  private static function get_host()
+  {
+    $ipAddress = (isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '');
+    $ipAddress = (isset($_SERVER['HTTP_FORWARDED']) ? $_SERVER['HTTP_FORWARDED'] : $ipAddress);
+    $ipAddress = (isset($_SERVER['HTTP_FORWARDED_FOR']) ? $_SERVER['HTTP_FORWARDED_FOR'] : $ipAddress);
+    $ipAddress = (isset($_SERVER['HTTP_X_FORWARDED']) ? $_SERVER['HTTP_X_FORWARDED'] : $ipAddress);
+    $ipAddress = (isset($_SERVER['HTTP_X_FORWARDED_FOR']) ? $_SERVER['HTTP_X_FORWARDED_FOR'] : $ipAddress);
+    return (isset($_SERVER['HTTP_CLIENT_IP']) ? $_SERVER['HTTP_CLIENT_IP'] : $ipAddress);
   }
 }

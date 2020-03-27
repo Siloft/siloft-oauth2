@@ -43,6 +43,11 @@ class HTTP
     self::send(404, 'Not Found', [ 'error' => $error ]);
   }
 
+  public static function internal_server_error($error)
+  {
+    self::send(500, 'Internal Server Error', [ 'error' => $error ]);
+  }
+
   private static function send($code, $name, $data)
   {
     header("HTTP/1.1 $code $name");
